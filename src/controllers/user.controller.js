@@ -1,23 +1,14 @@
-const lodash = require('lodash');
-const bcrypt = require('bcryptjs');
-const jwt = require('jsonwebtoken');
-const User = require('../models/user.model');
+const userService = require('../services/user.service');
 
 // User signup
 exports.signup = async (req, res) => {
   try {
     const { email, password, name } = req.body;
-    const existingUser = await User.findOne({ email });
 
-    if (existingUser) {
-      return res.status(400).json({ message: 'User already exists' });
-    }
+    // Call the service to handle signup
+    const newUser = await userService.signup(email, password, name);
 
-    const hashedPassword = await bcrypt.hash(password, 12);
-    const newUser = new User({ email, password: hashedPassword, name });
-
-    await newUser.save();
-    res.status(201).json({ message: 'User created successfully' });
+    res.status(201).json({ message: 'User created successfully', user: newUser });
   } catch (error) {
     res.status(500).json({ message: 'Server error', error });
   }
@@ -27,19 +18,11 @@ exports.signup = async (req, res) => {
 exports.login = async (req, res) => {
   try {
     const { email, password } = req.body;
-    const user = await User.findOne({ email });
 
-    if (!user) {
-      return res.status(400).json({ message: 'Invalid credentials' });
-    }
-
-    const isMatch = await bcrypt.compare(password, user.password);
-    if (!isMatch) {
-      return res.status(400).json({ message: 'Invalid credentials' });
-    }
-
-    const token = jwt.sign({ userId: user._id }, process.env.JWT_SECRET, { expiresIn: '1h' });
-    res.json({ token });
+    // Call the service to handle login
+    const user = await userService.login(email, password);
+    console.log(user);
+    res.json(user);
   } catch (error) {
     res.status(500).json({ message: 'Server error', error });
   }
@@ -48,10 +31,12 @@ exports.login = async (req, res) => {
 // Get user profile
 exports.getProfile = async (req, res) => {
   try {
-    const user = await User.findById(req.userId);
-    if (!user) return res.status(404).json({ message: 'User not found' });
+    const userId = req.userId;
 
-    res.json(lodash.omit(user.toObject(), ['password']));
+    // Call the service to get user profile
+    const user = await userService.getProfile(userId);
+
+    res.json(user);
   } catch (error) {
     res.status(500).json({ message: 'Server error', error });
   }
@@ -61,14 +46,12 @@ exports.getProfile = async (req, res) => {
 exports.editProfile = async (req, res) => {
   try {
     const { name, email } = req.body;
-    const user = await User.findById(req.userId);
-    if (!user) return res.status(404).json({ message: 'User not found' });
+    const userId = req.userId;
 
-    user.name = name || user.name;
-    user.email = email || user.email;
-    await user.save();
+    // Call the service to edit user profile
+    const updatedUser = await userService.editProfile(userId, { name, email });
 
-    res.json({ message: 'Profile updated successfully' });
+    res.json({ message: 'Profile updated successfully', user: updatedUser });
   } catch (error) {
     res.status(500).json({ message: 'Server error', error });
   }
@@ -77,8 +60,10 @@ exports.editProfile = async (req, res) => {
 // Delete user profile
 exports.deleteProfile = async (req, res) => {
   try {
-    const user = await User.findByIdAndDelete(req.userId);
-    if (!user) return res.status(404).json({ message: 'User not found' });
+    const userId = req.userId;
+
+    // Call the service to delete user profile
+    await userService.deleteProfile(userId);
 
     res.json({ message: 'User deleted successfully' });
   } catch (error) {
